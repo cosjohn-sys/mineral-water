@@ -210,14 +210,14 @@ const submit = () => {
             </section>
         </main>
 
-        <footer class="login-footer">
+        <!-- <footer class="login-footer">
             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#0074ed]">
                 <svg class="h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
                 </svg>
             </span>
             <p>Built for Water Refilling Stations in the Philippines</p>
-        </footer>
+        </footer> -->
     </div>
 </template>
 
@@ -269,8 +269,8 @@ const submit = () => {
 }
 
 .login-card {
-    width: 95%;
-    max-width: 616px;
+    width: 100%;
+    max-width: 500px;
     margin-top: 1.75rem;
     padding: clamp(2rem, 3vw, 3.25rem);
     padding-bottom: 2.5rem;
