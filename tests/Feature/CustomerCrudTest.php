@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -54,6 +55,73 @@ class CustomerCrudTest extends TestCase
                 ->has('customers.data', 2)
                 ->where('customers.current_page', 2)
                 ->where('customers.data.0.name', 'Customer 11'));
+    }
+
+    public function test_customer_summary_includes_the_whole_directory_and_only_registrations_this_month_so_far(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-04 12:00:00'));
+        DB::table('customers')->insert([
+            ['name' => 'Alice', 'created_at' => '2026-10-31 23:59:59'],
+            ['name' => 'Beth', 'created_at' => '2026-11-01 00:00:00'],
+            ['name' => 'Cara', 'created_at' => '2026-11-04 12:00:00'],
+            ['name' => 'Dara', 'created_at' => '2026-11-04 12:00:01'],
+            ['name' => 'Ella', 'created_at' => '2026-12-01 00:00:00'],
+            ['name' => 'Fran', 'created_at' => null],
+        ]);
+
+        $this->actingAs(User::factory()->create())->get(route('customers.index', ['search' => 'Alice']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('customers.data', 1)
+                ->where('customers.total', 1)
+                ->where('customerStats.total', 6)
+                ->where('customerStats.with_orders', 0)
+                ->where('customerStats.new_this_month', 2));
+    }
+
+    public function test_customer_order_counts_exclude_cancelled_and_future_sales_without_duplicating_payments(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-04 12:00:00'));
+        $user = User::factory()->create();
+        $aliceId = DB::table('customers')->insertGetId(['name' => 'Alice']);
+        $bethId = DB::table('customers')->insertGetId(['name' => 'Beth']);
+        $caraId = DB::table('customers')->insertGetId(['name' => 'Cara']);
+        DB::table('customers')->insert(['name' => 'Dara']);
+        DB::table('sales')->insert([
+            ['sale_number' => 'COMPLETED-1', 'customer_id' => $aliceId, 'user_id' => $user->id, 'sale_type' => 'walk_in', 'total_amount' => '50.00', 'status' => 'completed', 'sold_at' => '2026-11-04 10:00:00'],
+            ['sale_number' => 'COMPLETED-2', 'customer_id' => $aliceId, 'user_id' => $user->id, 'sale_type' => 'walk_in', 'total_amount' => '50.00', 'status' => 'completed', 'sold_at' => '2026-11-04 12:00:00'],
+            ['sale_number' => 'CANCELLED-1', 'customer_id' => $aliceId, 'user_id' => $user->id, 'sale_type' => 'walk_in', 'total_amount' => '50.00', 'status' => 'cancelled', 'sold_at' => '2026-11-04 10:00:00'],
+            ['sale_number' => 'CANCELLED-2', 'customer_id' => $bethId, 'user_id' => $user->id, 'sale_type' => 'walk_in', 'total_amount' => '50.00', 'status' => 'cancelled', 'sold_at' => '2026-11-04 10:00:00'],
+            ['sale_number' => 'FUTURE-1', 'customer_id' => $aliceId, 'user_id' => $user->id, 'sale_type' => 'walk_in', 'total_amount' => '50.00', 'status' => 'completed', 'sold_at' => '2026-11-04 12:00:01'],
+            ['sale_number' => 'FUTURE-2', 'customer_id' => $caraId, 'user_id' => $user->id, 'sale_type' => 'walk_in', 'total_amount' => '50.00', 'status' => 'completed', 'sold_at' => '2026-11-05 10:00:00'],
+            ['sale_number' => 'NO-CUSTOMER', 'customer_id' => null, 'user_id' => $user->id, 'sale_type' => 'walk_in', 'total_amount' => '50.00', 'status' => 'completed', 'sold_at' => '2026-11-04 10:00:00'],
+        ]);
+        $saleId = DB::table('sales')->where('sale_number', 'COMPLETED-1')->value('id');
+        DB::table('payments')->insert([
+            ['sale_id' => $saleId, 'amount' => '20.00', 'payment_method' => 'cash', 'paid_at' => '2026-11-04 11:00:00'],
+            ['sale_id' => $saleId, 'amount' => '30.00', 'payment_method' => 'gcash', 'paid_at' => '2026-11-04 11:00:00'],
+        ]);
+
+        $this->actingAs($user)->get(route('customers.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('customerStats.with_orders', 1)
+                ->where('customers.data.0.total_orders', 2)
+                ->where('customers.data.0.outstanding_balance', 50)
+                ->where('customers.data.1.total_orders', 0)
+                ->where('customers.data.2.total_orders', 0)
+                ->where('customers.data.3.total_orders', 0));
+    }
+
+    public function test_empty_customer_directory_has_zero_summary_counts(): void
+    {
+        $this->actingAs(User::factory()->create())->get(route('customers.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('customers.data', 0)
+                ->where('customerStats.total', 0)
+                ->where('customerStats.with_orders', 0)
+                ->where('customerStats.new_this_month', 0));
     }
 
     #[TestWith(['Ada'])]

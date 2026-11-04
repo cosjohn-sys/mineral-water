@@ -28,21 +28,29 @@ class CustomerController extends Controller
 
         $search = trim((string) $request->input('search', ''));
         $perPage = $request->integer('per_page') ?: 10;
+        $asOf = now();
+        $completedSales = DB::table('sales')->where('sales.status', 'completed')->where('sales.sold_at', '<=', $asOf);
+        $customerCounts = DB::table('customers')
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw('COUNT(CASE WHEN created_at >= ? AND created_at <= ? THEN 1 END) AS new_this_month', [$asOf->copy()->startOfMonth(), $asOf])
+            ->first();
         $paymentTotals = DB::table('payments')->select('sale_id')
             ->selectRaw('SUM(ROUND(amount * 100)) AS paid_cents')
-            ->whereNotExists(function (Builder $query): void {
+            ->whereNotExists(function (Builder $query) use ($asOf): void {
                 $query->selectRaw('1')->from('payment_reversals')->whereColumn('payment_id', 'payments.id')
-                    ->whereColumn('reversed_at', '>=', 'payments.paid_at')->where('reversed_at', '<=', now());
+                    ->whereColumn('reversed_at', '>=', 'payments.paid_at')->where('reversed_at', '<=', $asOf);
             })
-            ->where('amount', '>', 0)->whereIn('payment_method', ['cash', 'gcash'])->where('paid_at', '<=', now())->groupBy('sale_id');
-        $customerBalances = DB::table('sales')->where('sales.status', 'completed')->where('sales.sold_at', '<=', now())
+            ->where('amount', '>', 0)->whereIn('payment_method', ['cash', 'gcash'])->where('paid_at', '<=', $asOf)->groupBy('sale_id');
+        $customerBalances = (clone $completedSales)
             ->leftJoinSub($paymentTotals, 'payment_totals', 'payment_totals.sale_id', '=', 'sales.id')
             ->select('sales.customer_id')
+            ->selectRaw('COUNT(*) AS total_orders')
             ->selectRaw('SUM(CASE WHEN ROUND(sales.total_amount * 100) > COALESCE(payment_totals.paid_cents, 0) THEN ROUND(sales.total_amount * 100) - COALESCE(payment_totals.paid_cents, 0) ELSE 0 END) / 100.0 AS outstanding_balance')
             ->groupBy('sales.customer_id');
         $customers = DB::table('customers')
             ->leftJoinSub($customerBalances, 'customer_balances', 'customer_balances.customer_id', '=', 'customers.id')
             ->select('customers.id', 'customers.name', 'customers.phone', 'customers.address')
+            ->selectRaw('COALESCE(customer_balances.total_orders, 0) AS total_orders')
             ->selectRaw('COALESCE(customer_balances.outstanding_balance, 0) AS outstanding_balance')
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
@@ -58,6 +66,11 @@ class CustomerController extends Controller
 
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
+            'customerStats' => [
+                'total' => (int) $customerCounts->total,
+                'with_orders' => (clone $completedSales)->whereNotNull('customer_id')->distinct()->count('customer_id'),
+                'new_this_month' => (int) $customerCounts->new_this_month,
+            ],
             'filters' => ['search' => $search, 'per_page' => $perPage],
             'status' => session('status'),
         ]);

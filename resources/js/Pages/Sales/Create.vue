@@ -29,7 +29,7 @@ const form = useForm({
     customer_id: '',
     delivery_address: '',
     items: [],
-    initial_payment_type: 'none',
+    initial_payment_type: 'full',
     initial_payment_amount: '',
     payment_method: 'cash',
     track_gallon_exchange: false,
@@ -216,7 +216,12 @@ const submitSale = () => {
                         <legend class="sr-only">Initial payment</legend>
                         <h3 class="mb-4 text-sm font-bold text-slate-800">Initial payment</h3>
                         <div class="grid gap-4 sm:grid-cols-2">
-                            <div><InputLabel for="initial-payment-type" value="Payment now" /><select id="initial-payment-type" v-model="form.initial_payment_type" class="pos-input mt-1 w-full" aria-describedby="initial-payment-type-error"><option value="none">No initial payment</option><option value="full">Pay in full</option><option value="partial" :disabled="totalCents === 0">Partial payment</option></select><InputError id="initial-payment-type-error" :message="form.errors.initial_payment_type" class="mt-2" /></div>
+                            <div><InputLabel for="initial-payment-type" value="Payment now" />
+                                <select id="initial-payment-type" v-model="form.initial_payment_type" class="pos-input mt-1 w-full" aria-describedby="initial-payment-type-error">
+                                    <option value="full">Pay in full</option>
+                                    <option value="none">No initial payment</option>
+                                    <option value="partial" :disabled="totalCents === 0">Partial payment</option>
+                                </select><InputError id="initial-payment-type-error" :message="form.errors.initial_payment_type" class="mt-2" /></div>
                             <div v-if="form.initial_payment_type !== 'none'"><InputLabel for="initial-payment-method" value="Payment method" /><select id="initial-payment-method" v-model="form.payment_method" required class="pos-input mt-1 w-full" aria-describedby="initial-payment-method-error"><option value="cash">Cash</option><option value="gcash">GCash</option></select><InputError id="initial-payment-method-error" :message="form.errors.payment_method" class="mt-2" /></div>
                             <div v-if="form.initial_payment_type === 'partial'" class="sm:col-span-2"><InputLabel for="initial-payment-amount" value="Amount received now" /><TextInput id="initial-payment-amount" v-model="form.initial_payment_amount" type="number" min="0.01" :max="totalCents / 100" step="0.01" required class="pos-input mt-1 block w-full" :aria-invalid="Boolean(form.errors.initial_payment_amount)" aria-describedby="initial-payment-amount-error" /><InputError id="initial-payment-amount-error" :message="form.errors.initial_payment_amount" class="mt-2" /></div>
                         </div>
