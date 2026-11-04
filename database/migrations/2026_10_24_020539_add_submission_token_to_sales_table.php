@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('sales', function (Blueprint $table): void {
+            $table->uuid('submission_token')->nullable();
+            $table->unique(['user_id', 'submission_token']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('sales', function (Blueprint $table): void {
+            $table->dropUnique(['user_id', 'submission_token']);
+            $table->dropColumn('submission_token');
+        });
+    }
+};
