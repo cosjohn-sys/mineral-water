@@ -7,7 +7,9 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,9 +53,21 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
-        Auth::logout();
+        DB::transaction(function () use ($user): void {
+            DB::table('users')->where('id', $user->id)->lockForUpdate()->firstOrFail();
 
-        $user->delete();
+            if (DB::table('sales')->where('user_id', $user->id)->exists()
+                || DB::table('payments')->where('user_id', $user->id)->exists()
+                || DB::table('payment_reversals')->where('user_id', $user->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'password' => 'Accounts linked to sales, payments, or reversals cannot be deleted. Financial history must be preserved.',
+                ]);
+            }
+
+            DB::table('users')->where('id', $user->id)->delete();
+        }, 3);
+
+        Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

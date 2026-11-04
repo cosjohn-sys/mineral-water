@@ -46,9 +46,9 @@ const closeModal = () => {
             </h2>
 
             <p class="mt-1 text-sm text-gray-600">
-                Once your account is deleted, all of its resources and data will
-                be permanently deleted. Before deleting your account, please
-                download any data or information that you wish to retain.
+                Account deletion is permanent. Accounts linked to sales,
+                payments, or payment reversals must be retained to preserve
+                financial history.
             </p>
         </header>
 
@@ -63,9 +63,8 @@ const closeModal = () => {
                 </h2>
 
                 <p class="mt-1 text-sm text-gray-600">
-                    Once your account is deleted, all of its resources and data
-                    will be permanently deleted. Please enter your password to
-                    confirm you would like to permanently delete your account.
+                    Enter your password to permanently delete your account.
+                    Accounts linked to financial history cannot be deleted.
                 </p>
 
                 <div class="mt-6">
